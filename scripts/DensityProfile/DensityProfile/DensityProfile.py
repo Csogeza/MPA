@@ -62,7 +62,10 @@ def generate_broken_powerlaw_grid_vph(
     v_grid_max,
     templ_file="tardis_pow_cust_new_H.yml",
     outp_yml="tardis_broken_pow_cust_new.yml",
-	drs = ''
+	drs = '',
+    T_inner = 13750,
+    n_threads = 1,
+    n_packets = 2000000
 ):
 
     rho_ph = get_rhoph(n1, n2, v_ph, v_th, mu_e, t0)
@@ -109,6 +112,8 @@ def generate_broken_powerlaw_grid_vph(
         + str(v_th)
         + "-mu_e_"
         + str(mu_e)
+        + "-T_inn_"
+        + str(T_inner)
         + ".dat",
         "w",
     ) as f:
@@ -132,6 +137,8 @@ def generate_broken_powerlaw_grid_vph(
         + str(v_th)
         + "-mu_e_"
         + str(mu_e)
+        + "-T_inn_"
+        + str(T_inner)
         + ".dat"
     )
     yob["model"]["structure"]["v_inner_boundary"] = (
@@ -140,6 +147,9 @@ def generate_broken_powerlaw_grid_vph(
     # yob['model']['abundances']['H'] = str(X)
     # yob['model']['abundances']['He'] = str(Y)
     yob["supernova"]["time_explosion"] = str(round(t0, 10)) + " day"
+    yob["montecarlo"]["nthreads"]  = str(n_threads)
+    yob["montecarlo"]["no_of_packets"]  = str(n_packets)
+    yob["plasma"]["initial_t_inner"] = str(T_inner) + " K"
 
     with open(outp_yml, "w") as f:
         yaml.dump(yob, f)

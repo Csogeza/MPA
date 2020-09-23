@@ -16,7 +16,11 @@ def calc_vth_from_tau(n2, tau, mu_e, v_ph, rho_ph, t):
     
     temp = sig_e * t * rho_ph / (mu_e * tau * (n2 - 1)) * v_ph**n2
     
-    return numpy.power(temp, 1 / (n2 - 1)).to("km / s")
+    try:
+        return np.power(temp, 1 / (n2 - 1)).to("km / s")
+
+    except astropy.units.core.UnitConversionError:
+        return (np.power(temp.value, 1 / (n2 - 1))* u.cm / (1 * u.s)).to("km / s")
 
 
 # Transform the [0,1] range to the specified one (only uniform currently, except for tau - v)

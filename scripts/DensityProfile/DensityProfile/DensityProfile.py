@@ -36,8 +36,13 @@ def get_vinner(n1, n2, v_ph, v_th, mu_e, tau, rho_ph, t):
         first_t = tau * mu_e * (n1 - 1) / (rho_ph * sig_e * t) * v_th**(n2 - n1) / v_ph**(n2)
         second_t = 1 / v_th**(n1 - 1) * ( (n1 - 1) / (n2 - 1) - 1)
         
-    return (np.power(first_t - second_t, 1 / (1 - n1))).to("km / s")
-	# Astropy seems not to be able to raise the cm^n / s^n to the 1/n th power 
+    try:
+        return (np.power(first_t - second_t, 1 / (1 - n1))).to("km / s")
+
+    except astropy.units.core.UnitConversionError:
+        return (np.power(first_t.value - second_t.value, 1 / (1 - n1)) * u.cm / (1 * u.s)).to("km / s")
+    
+    # Astropy seems not to be able to raise the cm^n / s^n to the 1/n th power if n is a float
 
 
 	
@@ -147,8 +152,8 @@ def generate_broken_powerlaw_grid_vph(
     # yob['model']['abundances']['H'] = str(X)
     # yob['model']['abundances']['He'] = str(Y)
     yob["supernova"]["time_explosion"] = str(round(t0, 10)) + " day"
-    yob["montecarlo"]["nthreads"]  = str(n_threads)
-    yob["montecarlo"]["no_of_packets"]  = str(n_packets)
+    yob["montecarlo"]["nthreads"]  = n_threads
+    yob["montecarlo"]["no_of_packets"]  = n_packets
     yob["plasma"]["initial_t_inner"] = str(T_inner) + " K"
 
     with open(outp_yml, "w") as f:

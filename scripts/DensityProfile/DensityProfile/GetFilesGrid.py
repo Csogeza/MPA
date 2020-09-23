@@ -19,7 +19,7 @@ Nds = 60                  # The number of point pairs in the density profile fil
 
 vg_max = 14250            # The end of the velocity grid
 
-test_bool = False         # If true, a test set will be generated too
+test_bool = True         # If true, a test set will be generated too
 
 X = 0.548822580264        # Abundancies
 Y = 0.425148381550787
@@ -31,7 +31,7 @@ Zeff = 0.5470185894631937 # The ionization fraction of helium, necessary correct
 
 mu_e = BPL.calc_mu_mod(X, Y, Zeff)
 
-samples = generateGrid(N_gen, parameter_ints, n2, mu_e, v_ph, t, test = test_bool)
+samples = MGG.generateGrid(N_gen, parameter_ints, n2, mu_e, v_ph, t, test = test_bool)
 
 
 ################################################################################################################
@@ -39,7 +39,7 @@ samples = generateGrid(N_gen, parameter_ints, n2, mu_e, v_ph, t, test = test_boo
 # the source files for the simulations
 ################################################################################################################
 
-for i in range (sample[0].shape[0]):
+for i in range (samples[0].shape[0]):
     BPL.generate_broken_powerlaw_grid_vph(
         samples[0][i,0],
         n2,
@@ -60,7 +60,7 @@ for i in range (sample[0].shape[0]):
     
     
 if test_bool:
-    for i in range (sample[1].shape[0]):
+    for i in range (samples[1].shape[0]):
         BPL.generate_broken_powerlaw_grid_vph(
             samples[1][i,0],
             n2,

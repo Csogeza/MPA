@@ -184,13 +184,7 @@ def generate_powerlaw_grid_vph(
     mu_e,
     tau,
     vgrid_n,
-    v_grid_max,
-    templ_file="tardis_pow_cust_new_H.yml",
-    outp_yml="tardis_broken_pow_cust_new.yml",
-	drs = '',
-    T_inner = 13750,
-    n_threads = 1,
-    n_packets = 2000000
+    v_grid_max
 ):
 
     rho_ph = get_rhoph(n1, v_ph, mu_e, t0)
@@ -213,10 +207,12 @@ def generate_powerlaw_grid_vph(
 
 	
 	
-def get_breakoff_powerlaw(rhogrid, breakoff):
+def get_breakoff_powerlaw(vr_grid, breakoff):
+    
+    rhogrid = vr_grid.copy()
     
     total_dens = trapz(rhogrid[:,1], rhogrid[:,0])
-    rhogrid[rhogrid[:,0] > cuts[0], 1] = 0
+    rhogrid[rhogrid[:,0] > breakoff, 1] = 0
     
     new_dens = trapz(rhogrid[:,1], rhogrid[:,0])
     
@@ -226,11 +222,11 @@ def get_breakoff_powerlaw(rhogrid, breakoff):
 	
 	
 	
-def write_out_breakoff_profile(vr_prof, n1, n2, v_ph, t0, mu_e, tau, vgrid_n, v_grid_max,
+def write_out_breakoff_profile(vr_prof, n1, v_ph, v_br, t0, mu_e, tau, vgrid_n, v_grid_max,
     templ_file="tardis_pow_cust_new_H.yml", outp_yml="tardis_broken_pow_cust_new.yml", drs = '',
     T_inner = 13750, n_threads = 1, n_packets = 2000000, n_last_packets = 2000000):
     
-       with open(
+    with open(
             drs+"power-density-n1_"
             + str(n1)
             + "-t"
@@ -251,9 +247,9 @@ def write_out_breakoff_profile(vr_prof, n1, n2, v_ph, t0, mu_e, tau, vgrid_n, v_
             for i in range(vgrid.shape[0]):
                 f.write("%i\t%.3f\t%.7e\n" % (i, vr_prof[i,0], vr_prof[i,0]))
     
-        with open(templ_file) as f:
+    with open(templ_file) as f:
             yob = yaml.load(f)
-        yob["model"]["structure"]["filename"] = (
+    yob["model"]["structure"]["filename"] = (
             drs+"power-density-n1_"
             + str(n1)
             + "-t"
@@ -268,16 +264,16 @@ def write_out_breakoff_profile(vr_prof, n1, n2, v_ph, t0, mu_e, tau, vgrid_n, v_
             + str(T_inner)
             + ".dat"
         )
-        yob["model"]["structure"]["v_inner_boundary"] = (
+    yob["model"]["structure"]["v_inner_boundary"] = (
             str(round(v_inner.value, 5)) + " km/s"
         )
         
-        yob["supernova"]["time_explosion"] = str(round(t0, 10)) + " day"
-        yob["montecarlo"]["nthreads"]  = n_threads
-        yob["montecarlo"]["no_of_packets"]  = n_packets
-        yob["plasma"]["initial_t_inner"] = str(T_inner) + " K"
+    yob["supernova"]["time_explosion"] = str(round(t0, 10)) + " day"
+    yob["montecarlo"]["nthreads"]  = n_threads
+    yob["montecarlo"]["no_of_packets"]  = n_packets
+    yob["plasma"]["initial_t_inner"] = str(T_inner) + " K"
     
-        with open(outp_yml, "w") as f:
+    with open(outp_yml, "w") as f:
             yaml.dump(yob, f)
 	
 	

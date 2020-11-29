@@ -6,7 +6,7 @@ import math
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.optimize import root_scalar
 from scipy.interpolate import interp1d
-from scipy.integrate import quad
+from scipy.integrate import quad, trapz
 
 
 def get_rhoph_powerlaw(n1, v_ph, mu_e, t):
@@ -187,8 +187,8 @@ def generate_powerlaw_grid_vph(
     v_grid_max
 ):
 
-    rho_ph = get_rhoph(n1, v_ph, mu_e, t0)
-    v_inner = get_vinner(n1, v_ph, mu_e, tau, rho_ph, t0)
+    rho_ph = get_rhoph_powerlaw(n1, v_ph, mu_e, t0)
+    v_inner = get_vinner_powerlaw(n1, v_ph, mu_e, tau, rho_ph, t0)
     
     vgrid = np.logspace(math.log(v_inner.value,3), math.log(v_grid_max,3), vgrid_n)
     vgrid = ((vgrid - min(vgrid)) / (max(vgrid) - min(vgrid))) * (v_grid_max - v_inner.value) + v_inner.value 
@@ -221,11 +221,28 @@ def get_breakoff_powerlaw(vr_grid, breakoff):
     return np.vstack((rhogrid[:,0],new_rho)).T
 	
 	
+def get_breakoff_powerlaw_mod(vr_grid, breakoff):
+    
+    rhogrid = vr_grid.copy()
+    
+    total_dens = trapz(rhogrid[:,1], rhogrid[:,0])
+    rhogrid[rhogrid[:,0] > breakoff, 1] = 0
+    
+    new_dens = trapz(rhogrid[:,1], rhogrid[:,0])
+    
+    new_rho = rhogrid[:,1] / (new_dens / total_dens)
+    
+    return np.vstack((rhogrid[rhogrid[:,1] > 0,0],new_rho[rhogrid[:,1] > 0])).T
 	
-def write_out_breakoff_profile(vr_prof, n1, v_ph, v_br, t0, mu_e, tau, vgrid_n, v_grid_max,
+	
+	
+def write_out_breakoff_profile(vr_prof, n1, v_ph, v_br, t0, mu_e, tau,
     templ_file="tardis_pow_cust_new_H.yml", outp_yml="tardis_broken_pow_cust_new.yml", drs = '',
     T_inner = 13750, n_threads = 1, n_packets = 2000000, n_last_packets = 2000000):
     
+    rho_ph = get_rhoph_powerlaw(n1, v_ph, mu_e, t0)
+    v_inner = get_vinner_powerlaw(n1, v_ph, mu_e, tau, rho_ph, t0)
+	
     with open(
             drs+"power-density-n1_"
             + str(n1)
@@ -244,8 +261,8 @@ def write_out_breakoff_profile(vr_prof, n1, v_ph, v_br, t0, mu_e, tau, vgrid_n, 
         ) as f:
             f.write("%f day\n" % t0)
             f.write("# index velocity (km/s) density (g/cm^3)\n")
-            for i in range(vgrid.shape[0]):
-                f.write("%i\t%.3f\t%.7e\n" % (i, vr_prof[i,0], vr_prof[i,0]))
+            for i in range(vr_prof.shape[0]):
+                f.write("%i\t%.3f\t%.7e\n" % (i, vr_prof[i,0], vr_prof[i,1]))
     
     with open(templ_file) as f:
             yob = yaml.load(f)
@@ -270,6 +287,7 @@ def write_out_breakoff_profile(vr_prof, n1, v_ph, v_br, t0, mu_e, tau, vgrid_n, 
         
     yob["supernova"]["time_explosion"] = str(round(t0, 10)) + " day"
     yob["montecarlo"]["nthreads"]  = n_threads
+    yob["montecarlo"]["last_no_of_packets"]  = n_last_packets
     yob["montecarlo"]["no_of_packets"]  = n_packets
     yob["plasma"]["initial_t_inner"] = str(T_inner) + " K"
     

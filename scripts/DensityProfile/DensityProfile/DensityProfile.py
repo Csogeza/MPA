@@ -235,14 +235,58 @@ def get_breakoff_powerlaw_mod(vr_grid, breakoff):
     return np.vstack((rhogrid[rhogrid[:,1] > 0,0],new_rho[rhogrid[:,1] > 0])).T
 	
 	
+def emp_calc_vinner(v_cut, A, n, new_grid):
+    term = v_cut**(1 - n) - A * (1 - n) / (new_grid[0,0]**n * new_grid[0,1])
+    return np.power(term, 1 / (1 - n))
+	
+	
+def get_power_break_phmod(n1, v_ph, v_cut, t0, mu_e, tau, N, v_grid_max=14250, N_baseline=200):
+    # N_baseline --> high, so that the integrals will be accurate
+    vr_grid = generate_powerlaw_grid_vph(n1, v_ph, t0, mu_e, tau, N_baseline, v_grid_max) # This is the baseline
+    
+    # First: integrate only over the photospheric velocity. This will be the reference
+    cond = vr_grid[:,0] > v_ph
+    reference_integral = trapz(vr_grid[cond,1], vr_grid[cond,0])
+
+    # Second: we have to integrate for the part that will go missing, i.e. above the cutoff
+    cond2 = vr_grid[:,0] > v_cut
+    missing_dens = trapz(vr_grid[cond2,1], vr_grid[cond2,0])
+    
+    # Get the ratio of the two; how much do we have to multiply the density profile to get the same optical depth
+    factor = reference_integral / (reference_integral - missing_dens)
+    
+    # Set up a temporary grid for the integration
+    temp_grid = np.zeros(vr_grid.shape)
+    temp_grid[:,0] = vr_grid[:,0]
+    
+    # Multiply the temporary grid by the factor
+    temp_grid[temp_grid[:,0] < v_cut, 1] = factor * vr_grid[vr_grid[:,0] < v_cut, 1]
+    
+    # Reference integral (the complete, we want to match this by shifting the inner velocity)
+    A = trapz(vr_grid[:,1],vr_grid[:,0])
+    
+    v_inner = emp_calc_vinner(v_cut, A, n1, temp_grid)
+    # Now that we have the v_inner and v_cutoff, just set up the grid with the desired number of points
+        
+    vgrid = np.logspace(math.log(v_inner,3), math.log(v_cut,3), N)
+    vgrid = ((vgrid - min(vgrid)) / (max(vgrid) - min(vgrid))) * (v_cut - v_inner) + v_inner 
+
+    vgrid_mids = np.zeros(vgrid.shape)
+    vg_diffs = np.ediff1d(vgrid)
+    vgrid_mids[0] = vgrid[0] - vg_diffs[0]/2
+    vgrid_mids[1:] = vgrid[1:] - vg_diffs/2
+
+    rhogrid = np.zeros(vgrid.shape)
+
+    rhogrid = temp_grid[0,1] * np.power(temp_grid[0,0] / vgrid_mids, n1)
+    
+    return np.vstack((vgrid_mids,rhogrid)).T
+
 	
 def write_out_breakoff_profile(vr_prof, n1, v_ph, v_br, t0, mu_e, tau,
     templ_file="tardis_pow_cust_new_H.yml", outp_yml="tardis_broken_pow_cust_new.yml", drs = '',
     T_inner = 13750, n_threads = 1, n_packets = 2000000, n_last_packets = 2000000):
     
-    rho_ph = get_rhoph_powerlaw(n1, v_ph, mu_e, t0)
-    v_inner = get_vinner_powerlaw(n1, v_ph, mu_e, tau, rho_ph, t0)
-	
     with open(
             drs+"power-density-n1_"
             + str(n1)
@@ -282,7 +326,7 @@ def write_out_breakoff_profile(vr_prof, n1, v_ph, v_br, t0, mu_e, tau,
             + ".dat"
         )
     yob["model"]["structure"]["v_inner_boundary"] = (
-            str(round(v_inner.value, 5)) + " km/s"
+            str(round(vr_prof[0,0], 5)) + " km/s"
         )
         
     yob["supernova"]["time_explosion"] = str(round(t0, 10)) + " day"

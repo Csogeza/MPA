@@ -17,13 +17,8 @@ model:
 
   abundances:
     type: uniform
-    O: 0.19
-    Mg: 0.03
-    Si: 0.52
-    S: 0.19
-    Ar: 0.04
-    Ca: 0.03
-
+    H: 1.0
+    
 plasma:
   disable_electron_scattering: no
   ionization: lte

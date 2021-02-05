@@ -21,8 +21,22 @@ def calc_vth_from_tau(n2, tau, mu_e, v_ph, rho_ph, t):
 
     except astropy.units.core.UnitConversionError:
         return (np.power(temp.value, 1 / (n2 - 1))* u.cm / (1 * u.s)).to("km / s")
+		
+def calc_tau_from_vth(n2, v_th, mu_e, v_ph, rho_ph, t):
+    # However, this works only if we ensure that v_th < v_ph, otherwise we need a more
+    # complex mehtod for the determination of the photospheric density
+    
+    v_ph = (v_ph * u.kilometer / (1 * u.s)).to("cm / s")
+	v_th = (v_th * u.kilometer / (1 * u.s)).to("cm / s")
+    mu_e = mu_e * u.gram
+    sig_e = astropy.constants.sigma_T.to("cm2")
+    t = (t * u.day).to(u.s)
+    
+    tau = sig_e * t * rho_ph / (mu_e * (n2 - 1)) * v_ph**n2 / (v_th**(n2 - 1))
 
+    return tau
 
+	
 # Transform the [0,1] range to the specified one (only uniform currently, except for tau - v)
 def transformScales(sample, parameter_ints, n2, mu_e, v_ph, t):
     

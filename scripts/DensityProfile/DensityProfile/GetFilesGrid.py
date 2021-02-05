@@ -11,11 +11,11 @@ v_ph = 7794  # Photospheric velocity
 tau = 18.54  # At the inner boundary
 t = 18.5355  # Time since explosion
 
-parameter_ints = [[6, 10], [2/3, 2.5], [0, 1]]    # This is where we modify the parameter intervals
+parameter_ints = [[6, 10], [2/3, 14/3], [12750, 14750]]    # This is where we modify the parameter intervals
 
 N_gen = 10                # Number of spectra to be simulated
 
-Nds = 60                  # The number of point pairs in the density profile files
+Nds = 45                  # The number of point pairs in the density profile files
 
 vg_max = 14250            # The end of the velocity grid
 
@@ -32,7 +32,9 @@ Zeff = 0.5470185894631937 # The ionization fraction of helium, necessary correct
 mu_e = BPL.calc_mu_mod(X, Y, Zeff)
 
 samples = MGG.generateGrid(N_gen, parameter_ints, n2, mu_e, v_ph, t, test = test_bool)
-
+dataset = pd.DataFrame({'n1': data[:,0], 'v_th': data[:,1], 'T_inner': data[:,2]})
+dataset.to_csv('grid_parameters.csv')
+# Save the parameter array to pd.Df
 
 ################################################################################################################
 # Now that we have the uniform sample in the multi dimensional field of the physical parameters, we can generate

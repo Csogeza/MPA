@@ -27,6 +27,7 @@ from sklearn.gaussian_process.kernels import (
     RBF, WhiteKernel, Matern,
     ConstantKernel as C
 )
+from scipy.spatial import Delaunay
 from collections import namedtuple, OrderedDict
 from numpy.random import RandomState
 
@@ -37,7 +38,7 @@ re_Z = re.compile('Z(?P<Z_value>[0-9]\.[0-9]{2,})') # noqa
 telluric_bands = {
     'none': [],
     'NaD': [[5870, 5920]],
-    'full': [[5870, 5920], [6830, 7000], [7550, 7690]]
+    'full': [[5870, 5920], [6820, 6890], [7530, 7670]]
 }
 
 CCM_AS_AV_ratio = {'B': 1.337, 'R': 0.751, 'V': 1.0, 'I': 0.479}
@@ -70,6 +71,8 @@ print "Using savgol order {}".format(sav_order)
 
 wav_path = os.path.join(my_path, 'util_data', 'wav.hdf')
 
+def in_hull(p, hull):
+    return hull.find_simplex(p) >= 0
 
 def parse_params(path='./', abunds=None, parse_density=False,
                  ref_path=None, files=None, index_by_fname=False,
@@ -386,8 +389,8 @@ def parse_pms_new(path='./', n_components=3, wav_range=(2500, 10000), shift=Fals
 
     #params_dict = {'v': v, 'T': T_inner, 'T_ph': T_phs, 'n1': n1, 'tau_th': tau_ths}
     #params_dict = {'T': T_inner, 'T_ph': T_phs, 'n1': n1, 'tau_th': tau_ths}
-    params_dict = {'T': Ts, 'T_ph': T_phs, 'n1': n1, 'v_ph': v_phs}  # Just ignore the tau-s for the 2d case
-
+    params_dict = {'T': Ts, 'T_ph': T_phs, 'n1': n1, 'v_ph': v_phs} 
+    # The T will be dropped anyways at the first step 
 
     params_frame = pd.DataFrame.from_dict(params_dict)
     mags = calculate_grid_magnitudes(files)
@@ -463,6 +466,10 @@ class T_v_emulator(object):
         self.a_min = a[0]
         self.a_max = a[1]
 
+        self.hull1 = None
+        self.hull2 = None
+        self.hull3 = None
+
         self.n_preset = None
         self.v_shift = v_shift
         self.a_prior = UniformPrior(self.a_min, self.a_max, name='A')
@@ -527,13 +534,27 @@ class T_v_emulator(object):
             gpmag.fit(self.X, mags)
             self.model_mags_interpolators[band] = gpmag
 
+    def setup_hulls(self, Temp_t = 6700):
+        T_set = self.params_frame['T_ph'].values
+        v_set = self.params_frame['v_ph'].values
+
+        points1 = np.vstack((T_set[T_set < Temp_t], v_set[T_set < Temp_t])).T
+        self.hull1 = ConvexHull(points1)
+
+        points2 = np.vstack((T_set[T_set > Temp_t], v_set[T_set > Temp_t])).T
+        self.hull2 = ConvexHull(points2)
+
+        cond3 = (T_set > Temp_t - 250) & (T_set < Temp_t + 250)
+        points3 = np.vstack((T_set[cond3],v_set[cond3])).T
+        self.hull3 = ConvexHull(points3)
+
     def emulate(self, x, return_std=False, sample=False, prepare_cov=False, fixed_vph=False):
         i = -1
         eigen = np.zeros(self.pca.n_components)
         stds = np.zeros_like(eigen)
         
         # v1 = np.exp(x['v'])
-        v1 = x['v_ph']
+        # v1 = x['v_ph']
         if fixed_vph:
             x.drop('v_ph', inplace=True)
         #    print(x)
@@ -587,9 +608,15 @@ class T_v_emulator(object):
             return emu_spec, std_spec.flatten()
         else:
             return emu_spec
-
+        
     def loglike_corr(self, x):
         x_series = pd.Series(x, self.prior.names)
+        if self.shift:
+            x_pos = x_series[['T_ph','v_ph']].values
+			bool_list = [in_hull(x_pos, t_hull) for t_hull in 
+                            [self.hull1, self.hull2, self.hull3]]
+            if 1 not in bool_list:
+                return 9999
         if self.n_preset is not None:
             x_series['n1'] = self.n_preset
         x_emu = x_series.loc[self.params.columns]
